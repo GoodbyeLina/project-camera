@@ -8,9 +8,9 @@
 - INMP411 WS → ESP32-S3 I2S时钟引脚(可选)
 
 推荐引脚配置：
-- DATA: GPIO_NUM_12
-- BCK: GPIO_NUM_13  
-- WS: GPIO_NUM_14
+- DATA: GPIO_NUM_21
+- BCK: GPIO_NUM_47  
+- WS: GPIO_NUM_48
 
 ## 软件实现要点
 
@@ -25,17 +25,42 @@
 - 使用DMA缓冲区接收音频数据
 - 可添加环形缓冲区实现实时处理
 - 支持三种输出方式:
-  * 本地打印数据信息
+  * 串口实时打印采样数据(通过ESP_LOGI)
   * 通过串口传输WAV格式数据(921600波特率)
   * 直接保存到电脑文件系统
-- 串口传输说明:
-  - 使用UART0(默认引脚)
-  - 自动添加WAV文件头(16kHz, 16bit, 单声道)
-  - 电脑端接收后可直接保存为.wav文件播放
-- 文件保存说明:
-  - 调用inmp411_set_save_path()设置保存路径
-  - 调用inmp411_start_record(true)启用保存功能
-  - 录音数据将实时写入指定.wav文件
+
+#### 串口实时打印说明:
+- 默认打印每次读取的字节数
+- 打印前4个采样点数据
+- 示例输出:
+```
+I (1234) INMP411: Recorded 1024 bytes
+I (1234) INMP411: Sample[0]: 123  
+I (1234) INMP411: Sample[1]: -45
+I (1234) INMP411: Sample[2]: 67
+I (1234) INMP411: Sample[3]: 89
+```
+
+#### 初始化日志:
+系统启动时会打印初始化信息:
+```
+I (1234) INMP411: 麦克风初始化成功
+I (1234) INMP411: 配置参数：
+I (1234) INMP411:   DATA引脚: 21
+I (1234) INMP411:   BCK引脚: 47 
+I (1234) INMP411:   WS引脚: 48
+I (1234) INMP411:   采样率: 16000 Hz
+```
+
+#### 串口传输说明:
+- 使用UART0(默认引脚)
+- 自动添加WAV文件头(16kHz, 16bit, 单声道)
+- 电脑端接收后可直接保存为.wav文件播放
+
+#### 文件保存说明:
+- 调用inmp411_set_save_path()设置保存路径
+- 调用inmp411_start_record(true)启用保存功能
+- 录音数据将实时写入指定.wav文件
 
 ### 3. 电源管理
 - INMP411需要3.3V供电
@@ -89,10 +114,10 @@ i2s_std_config_t i2s_config = {
         I2S_SLOT_MODE_MONO),
     .gpio_cfg = {
         .mclk = I2S_GPIO_UNUSED,
-        .bclk = GPIO_NUM_13,
-        .ws = GPIO_NUM_14,
+        .bclk = GPIO_NUM_47,
+        .ws = GPIO_NUM_48,
         .dout = I2S_GPIO_UNUSED,
-        .din = GPIO_NUM_12,
+        .din = GPIO_NUM_21,
         .invert_flags = {
             .mclk_inv = false,
             .bclk_inv = false,

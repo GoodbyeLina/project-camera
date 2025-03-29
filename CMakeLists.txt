@@ -5,4 +5,11 @@
 cmake_minimum_required(VERSION 3.5)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
+# Add extra components directory
+set(EXTRA_COMPONENT_DIRS components)
+
 project(project-camera)
+
+# Require esp32-camera component
+list(APPEND COMPONENTS esp32-camera)

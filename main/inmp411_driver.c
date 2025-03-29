@@ -4,6 +4,8 @@
 #include "esp_err.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+
+#define INMP411_TAG "INMP411"
 #include <string.h>
 #include <stdio.h>
 #include <sys/unistd.h>
@@ -12,9 +14,9 @@
 
 // 配置参数
 #define I2S_SAMPLE_RATE     16000
-#define I2S_DATA_PIN        12
-#define I2S_BCK_PIN         13
-#define I2S_WS_PIN          14
+#define I2S_DATA_PIN        21
+#define I2S_BCK_PIN         47
+#define I2S_WS_PIN          48
 #define I2S_BUFFER_SIZE     1024
 
 static i2s_chan_handle_t rx_handle;
@@ -37,7 +39,12 @@ static void record_task(void *arg) {
     
     while(1) {
         i2s_channel_read(rx_handle, buffer, I2S_BUFFER_SIZE, &bytes_read, portMAX_DELAY);
-        printf("Recorded %d bytes\n", bytes_read);
+        ESP_LOGI(INMP411_TAG, "Recorded %d bytes", bytes_read);
+        
+        // 打印前4个采样点(每通道1个)
+        for(int i=0; i<4 && i<bytes_read/sizeof(int16_t); i++) {
+            ESP_LOGI(INMP411_TAG, "Sample[%d]: %d", i, buffer[i]);
+        }
         
         if (save_to_pc && file_fd >= 0) {
             write(file_fd, buffer, bytes_read);
@@ -76,6 +83,13 @@ void inmp411_init() {
     };
     
     i2s_channel_init_std_mode(rx_handle, &std_cfg);
+    
+    ESP_LOGI("INMP411", "麦克风初始化成功");
+    ESP_LOGI("INMP411", "配置参数：");
+    ESP_LOGI("INMP411", "  DATA引脚: %d", I2S_DATA_PIN);
+    ESP_LOGI("INMP411", "  BCK引脚: %d", I2S_BCK_PIN);
+    ESP_LOGI("INMP411", "  WS引脚: %d", I2S_WS_PIN);
+    ESP_LOGI("INMP411", "  采样率: %d Hz", I2S_SAMPLE_RATE);
 }
 
 void inmp411_set_save_path(const char* path) {
