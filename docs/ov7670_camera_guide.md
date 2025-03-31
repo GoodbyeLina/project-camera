@@ -208,3 +208,27 @@ void start_webserver() {
 1. 设备连接WiFi后会打印IP地址
 2. 在浏览器访问 `http://[设备IP]/camera.jpg` 即可获取实时图像
 3. 图像质量可通过修改frame2jpg的quality参数调整(默认80)
+
+## 系统架构图
+```mermaid
+graph TD
+    A[OV7670摄像头] -->|图像数据| B(ESP32)
+    B -->|WiFi传输| C[Web服务器]
+    C --> D[网页界面]
+    D -->|HTTP请求| C
+    C -->|MJPEG流| D
+```
+
+## 程序流程图
+```mermaid
+flowchart TD
+    Start[启动] --> Init[初始化硬件]
+    Init --> WiFi[连接WiFi]
+    WiFi --> Server[启动Web服务器]
+    Server --> |"/camera.jpg"| Jpeg[单张图片处理]
+    Server --> |"/video"| Stream[视频流处理]
+    Jpeg --> Loop
+    Stream --> Loop
+    Loop --> Delay[等待5秒]
+    Delay --> Jpeg
+```
