@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32 Camera Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        #cameraImage {
+            max-width: 100%;
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>ESP32 Camera Viewer</h1>
+    <button onclick="refreshImage()">Refresh Image</button>
+    <div>
+        <img id="cameraImage" src="http://esp32-camera.local/camera.jpg" onerror="imageError()">
+    </div>
+    <p id="status"></p>
+
+    <script>
+        function refreshImage() {
+            const img = document.getElementById('cameraImage');
+            const status = document.getElementById('status');
+            
+            status.textContent = 'Loading...';
+            img.src = 'http://esp32-camera.local/camera.jpg?' + new Date().getTime();
+        }
+
+        function imageError() {
+            document.getElementById('status').textContent = 
+                'Error loading image. Make sure ESP32 is connected to WiFi and the server is running.';
+        }
+
+        // Auto refresh every 5 seconds
+        setInterval(refreshImage, 5000);
+    </script>
+</body>
+</html>

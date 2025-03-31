@@ -93,3 +93,61 @@ void app_main() {
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
+
+## HTTP图像服务器功能
+
+### 功能说明
+1. 提供通过HTTP访问摄像头图像的接口
+2. 访问URL: http://[设备IP]/camera.jpg
+3. 自动将YUV图像转换为JPEG格式
+
+### 技术实现
+```c
+// HTTP请求处理函数
+static esp_err_t jpeg_handler(httpd_req_t *req) {
+    camera_fb_t *pic = esp_camera_fb_get();
+    if (!pic) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    // 转换YUV为JPEG
+    size_t jpg_buf_len = 0;
+    uint8_t *jpg_buf = NULL;
+    bool jpeg_converted = frame2jpg(pic, 80, &jpg_buf, &jpg_buf_len);
+    
+    esp_camera_fb_return(pic);
+    
+    if(!jpeg_converted) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "image/jpeg");
+    httpd_resp_send(req, (const char *)jpg_buf, jpg_buf_len);
+    free(jpg_buf);
+    return ESP_OK;
+}
+
+// 服务器启动代码
+void start_webserver() {
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    httpd_handle_t server = NULL;
+    
+    httpd_uri_t jpeg_uri = {
+        .uri = "/camera.jpg",
+        .method = HTTP_GET,
+        .handler = jpeg_handler,
+        .user_ctx = NULL
+    };
+
+    if (httpd_start(&server, &config) == ESP_OK) {
+        httpd_register_uri_handler(server, &jpeg_uri);
+    }
+}
+```
+
+### 使用说明
+1. 设备连接WiFi后会打印IP地址
+2. 在浏览器访问 `http://[设备IP]/camera.jpg` 即可获取实时图像
+3. 图像质量可通过修改frame2jpg的quality参数调整(默认80)
