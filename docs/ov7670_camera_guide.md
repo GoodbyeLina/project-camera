@@ -94,6 +94,63 @@ void app_main() {
     }
 }
 
+## 视频流功能
+
+### 功能说明
+1. 提供实时视频流传输功能
+2. 访问URL: http://[设备IP]/video
+3. 采用MJPEG流格式传输
+4. 帧率可配置(默认15fps)
+
+### 技术实现
+```c
+// 视频流处理函数
+static esp_err_t stream_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=frame");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+
+    while (1) {
+        camera_fb_t *pic = esp_camera_fb_get();
+        if (!pic) {
+            continue;
+        }
+
+        size_t jpg_buf_len = 0;
+        uint8_t *jpg_buf = NULL;
+        if(frame2jpg(pic, 80, &jpg_buf, &jpg_buf_len)) {
+            char part_buf[64];
+            sprintf(part_buf, "\r\n--frame\r\nContent-Type: image/jpeg\r\n\r\n");
+            httpd_resp_send_chunk(req, part_buf, strlen(part_buf));
+            httpd_resp_send_chunk(req, (const char *)jpg_buf, jpg_buf_len);
+            free(jpg_buf);
+        }
+        esp_camera_fb_return(pic);
+        vTaskDelay(1000 / configSTREAM_FPS / portTICK_PERIOD_MS);
+    }
+    return ESP_OK;
+}
+
+// 服务器配置
+void start_webserver() {
+    // ...原有代码...
+    
+    httpd_uri_t stream_uri = {
+        .uri = "/video",
+        .method = HTTP_GET,
+        .handler = stream_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &stream_uri);
+}
+```
+
+### 使用说明
+1. 在浏览器访问 `http://[设备IP]/video`
+2. 支持HTML5的浏览器会自动播放视频流
+3. 帧率可通过修改configSTREAM_FPS调整
+4. 视频质量通过frame2jpg的quality参数控制(默认80)
+
 ## HTTP图像服务器功能
 
 ### 功能说明

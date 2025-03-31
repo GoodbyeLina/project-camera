@@ -10,7 +10,35 @@
 #include "ov7670_driver.h"
 
 #define TEST_MODE 0  // 1=测试模式 0=正常摄像头模式
+#define STREAM_FPS 15
 
+
+// 视频流处理函数
+static esp_err_t stream_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=frame");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+
+    while (1) {
+        camera_fb_t *pic = esp_camera_fb_get();
+        if (!pic) {
+            continue;
+        }
+
+        size_t jpg_buf_len = 0;
+        uint8_t *jpg_buf = NULL;
+        if(frame2jpg(pic, 80, &jpg_buf, &jpg_buf_len)) {
+            char part_buf[64];
+            sprintf(part_buf, "\r\n--frame\r\nContent-Type: image/jpeg\r\n\r\n");
+            httpd_resp_send_chunk(req, part_buf, strlen(part_buf));
+            httpd_resp_send_chunk(req, (const char *)jpg_buf, jpg_buf_len);
+            free(jpg_buf);
+        }
+        esp_camera_fb_return(pic);
+        vTaskDelay(1000 / STREAM_FPS / portTICK_PERIOD_MS);
+    }
+    return ESP_OK;
+}
 
 // JPEG图像请求处理
 static esp_err_t jpeg_handler(httpd_req_t *req) {
@@ -69,8 +97,16 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
             .user_ctx = NULL
         };
 
+        httpd_uri_t stream_uri = {
+            .uri = "/video",
+            .method = HTTP_GET,
+            .handler = stream_handler,
+            .user_ctx = NULL
+        };
+
         if (httpd_start(&server, &config) == ESP_OK) {
             httpd_register_uri_handler(server, &jpeg_uri);
+            httpd_register_uri_handler(server, &stream_uri);
             ESP_LOGI("WIFI", "HTTP server started");
         } else {
             ESP_LOGE("WIFI", "Failed to start HTTP server");
