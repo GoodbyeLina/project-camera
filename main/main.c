@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
@@ -8,6 +9,10 @@
 #include "esp_http_server.h"
 #include "inmp411_driver.h"
 #include "ov7670_driver.h"
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 
 #define TEST_MODE 0  // 1=测试模式 0=正常摄像头模式
 #define STREAM_FPS 15
@@ -18,6 +23,36 @@ static esp_err_t stream_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=frame");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    
+    // 视频分段保存相关变量
+    static int sock = -1;
+    static uint32_t segment_count = 0;
+    static time_t segment_start = 0;
+    time_t now = time(NULL);
+    
+    // 每10秒创建新连接
+    if (sock == -1 || now - segment_start >= 10) {
+        if (sock != -1) {
+            close(sock);
+        }
+        
+        // 连接到电脑的接收服务
+        struct sockaddr_in server_addr;
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(8080);
+        server_addr.sin_addr.s_addr = inet_addr("192.168.1.199"); // 使用用户提供的电脑IP
+        
+        if(connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+            ESP_LOGE("STREAM", "Failed to connect to %s:%d",
+                   inet_ntoa(server_addr.sin_addr),
+                   ntohs(server_addr.sin_port));
+            sock = -1;
+        } else {
+            segment_start = now;
+            segment_count++;
+        }
+    }
 
     while (1) {
         camera_fb_t *pic = esp_camera_fb_get();
@@ -32,10 +67,21 @@ static esp_err_t stream_handler(httpd_req_t *req) {
             sprintf(part_buf, "\r\n--frame\r\nContent-Type: image/jpeg\r\n\r\n");
             httpd_resp_send_chunk(req, part_buf, strlen(part_buf));
             httpd_resp_send_chunk(req, (const char *)jpg_buf, jpg_buf_len);
+            
+            // 发送到电脑
+            if (sock != -1) {
+                send(sock, part_buf, strlen(part_buf), 0);
+                send(sock, jpg_buf, jpg_buf_len, 0);
+            }
+            
             free(jpg_buf);
         }
         esp_camera_fb_return(pic);
         vTaskDelay(1000 / STREAM_FPS / portTICK_PERIOD_MS);
+    }
+    
+    if (sock != -1) {
+        close(sock);
     }
     return ESP_OK;
 }

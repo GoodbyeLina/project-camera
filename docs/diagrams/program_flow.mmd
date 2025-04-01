@@ -1,0 +1,10 @@
+flowchart TD
+    Start[启动] --> Init[初始化硬件]
+    Init --> WiFi[连接WiFi]
+    WiFi --> Server[启动Web服务器]
+    Server --> |"/camera.jpg"| Jpeg[单张图片处理]
+    Server --> |"/video"| Stream[视频流处理]
+    Jpeg --> Loop
+    Stream --> Loop
+    Loop --> Delay[等待5秒]
+    Delay --> Jpeg

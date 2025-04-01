@@ -1,0 +1,6 @@
+graph TD
+    A[OV7670摄像头] -->|图像数据| B(ESP32)
+    B -->|WiFi传输| C[Web服务器]
+    C --> D[网页界面]
+    D -->|HTTP请求| C
+    C -->|MJPEG流| D
